@@ -54,8 +54,11 @@ class Strategy(base.Strategy):
             temp_loss.backward()
             for key in fisher_dict.keys():
                 grad_dict[key] += {k:v.grad**2 for k,v in trained_model.named_parameters()}[key]
+            trained_model.loss_criterion.zero_grad()
             if idx == num_items:
                 break
+
+
 
         for key in val_dict.keys():
             fisher_dict[key] = 1 / (2 * num_items) * val_dict[key] ** 2 * grad_dict[key]

@@ -1,0 +1,14 @@
+Dataset Hyperparameters
+    * dataset_name => mnist
+    * batch_size => 128
+Model Hyperparameters
+    * model_name => mnist_lenet_300_100
+    * model_init => kaiming_normal
+    * batchnorm_init => uniform
+Pruning Hyperparameters
+    * pruning_strategy => sparse_global
+    * pruning_fraction => 0.2
+Training Hyperparameters
+    * optimizer_name => adam
+    * lr => 0.0001
+    * training_steps => 10ep

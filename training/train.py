@@ -55,7 +55,7 @@ def train(
         full `training_hparams.training_steps` steps.
     """
 
-    print(model.state_dict())
+    #print(model.state_dict())
     # Create the output location if it doesn't already exist.
     if not get_platform().exists(output_location) and get_platform().is_primary_process:
         get_platform().makedirs(output_location)
