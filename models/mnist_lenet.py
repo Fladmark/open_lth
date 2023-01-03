@@ -5,6 +5,7 @@
 
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 
 from foundations import hparams
 from lottery.desc import LotteryDesc
@@ -16,6 +17,7 @@ class Model(base.Model):
     '''A LeNet fully-connected model for CIFAR-10'''
 
     def __init__(self, plan, initializer, outputs=10):
+        torch.manual_seed(123)
         super(Model, self).__init__()
 
         layers = []
@@ -88,6 +90,7 @@ class Model(base.Model):
         )
 
         pruning_hparams = sparse_global.PruningHparams(
+            #pruning_strategy='sparse_global',
             pruning_strategy='sparse_global',
             pruning_fraction=0.2,
             pruning_layers_to_ignore='fc.weight',
