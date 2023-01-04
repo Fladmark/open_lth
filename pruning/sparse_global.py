@@ -5,6 +5,7 @@
 
 import dataclasses
 import numpy as np
+import torch
 
 from foundations import hparams
 import models.base
@@ -16,11 +17,13 @@ from pruning.mask import Mask
 class PruningHparams(hparams.PruningHparams):
     pruning_fraction: float = 0.2
     pruning_layers_to_ignore: str = None
+    pruning_method:str = "l1_unstructured"
 
     _name = 'Hyperparameters for Sparse Global Pruning'
     _description = 'Hyperparameters that modify the way pruning occurs.'
     _pruning_fraction = 'The fraction of additional weights to prune from the network.'
     _layers_to_ignore = 'A comma-separated list of addititonal tensors that should not be pruned.'
+    _pruning_method = 'What pruning method to use? (e.g. l1_unstructured, random_unstructured)'
 
 
 class Strategy(base.Strategy):
@@ -42,10 +45,17 @@ class Strategy(base.Strategy):
         if pruning_hparams.pruning_layers_to_ignore:
             prunable_tensors -= set(pruning_hparams.pruning_layers_to_ignore.split(','))
 
+        if pruning_hparams.pruning_method == "random_unstructured":
+            print("random prune")
+            random_weights = {k: torch.rand_like(v).clone().cpu().detach().numpy()
+                    for k, v in trained_model.state_dict().items()
+                    if k in prunable_tensors}
+            weights = random_weights
+        else:
         # Get the model weights.
-        weights = {k: v.clone().cpu().detach().numpy()
-                   for k, v in trained_model.state_dict().items()
-                   if k in prunable_tensors}
+            weights = {k: v.clone().cpu().detach().numpy()
+                    for k, v in trained_model.state_dict().items()
+                    if k in prunable_tensors}
 
 
 
