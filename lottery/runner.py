@@ -111,6 +111,7 @@ class LotteryRunner(Runner):
 
         model = models.registry.load(self.desc.run_path(self.replicate, 0), self.desc.train_start_step,
                                      self.desc.model_hparams, self.desc.train_outputs)
+        mask = Mask.load(location)
         pruned_model = PrunedModel(model, Mask.load(location))
         pruned_model.save(location, self.desc.train_start_step)
         if self.verbose and get_platform().is_primary_process:
@@ -118,6 +119,17 @@ class LotteryRunner(Runner):
         train.standard_train(pruned_model, location, self.desc.dataset_hparams, self.desc.training_hparams,
                              start_step=self.desc.train_start_step, verbose=self.verbose,
                              evaluate_every_epoch=self.evaluate_every_epoch)
+
+        ### for weight movement calculation
+        initial_model_trained = models.registry.load(self.desc.run_path(self.replicate, 0), self.desc.train_end_step,
+                                     self.desc.model_hparams, self.desc.train_outputs)
+        # reload the initial model with the mask of the current model to calculate the differences correctly
+        initial_model_trained = PrunedModel(initial_model_trained, mask)
+        initial_model_trained._apply_mask()
+        diff = sum((x.detach().cpu() - y.detach().cpu()).abs().sum() for x, y in zip(initial_model_trained.parameters(), pruned_model.parameters()))
+        diff = diff.item()
+        unpruned_weights = mask.count_unpruned_weights().item()
+        print("abs diff:", diff, "unpruned weights:", unpruned_weights, "avg_diff:", diff / unpruned_weights)
 
     def _prune_level(self, level: int):
         new_location = self.desc.run_path(self.replicate, level)

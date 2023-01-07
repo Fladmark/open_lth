@@ -60,6 +60,10 @@ class Mask(dict):
     def numpy(self):
         return {k: v.cpu().numpy() for k, v in self.items()}
 
+    def count_unpruned_weights(self):
+        unpruned = torch.sum(torch.tensor([torch.sum(v) for v in self.values()]))
+        return unpruned
+
     @property
     def sparsity(self):
         """Return the percent of weights that have been pruned as a decimal."""
