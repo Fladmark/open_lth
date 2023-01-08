@@ -24,6 +24,8 @@ class LotteryRunner(Runner):
     desc: LotteryDesc
     verbose: bool = True
     evaluate_every_epoch: bool = True
+    show_weight_movement: bool = False
+    weight_movements = []
 
     @staticmethod
     def description():
@@ -39,6 +41,12 @@ class LotteryRunner(Runner):
         parser.add_argument('--levels', required=True, type=int, help=help_text)
 
     @staticmethod
+    def _add_show_weight_movement_argument(parser):
+        help_text = \
+            'show weights movement between pruned and unpruned network.'
+        parser.add_argument('--show_weight_movement', action='store_true', help=help_text)
+
+    @staticmethod
     def add_args(parser: argparse.ArgumentParser) -> None:
         # Get preliminary information.
         defaults = shared_args.maybe_get_default_hparams()
@@ -48,12 +56,13 @@ class LotteryRunner(Runner):
         lottery_parser = parser.add_argument_group(
             'Lottery Ticket Hyperparameters', 'Hyperparameters that control the lottery ticket process.')
         LotteryRunner._add_levels_argument(lottery_parser)
+        LotteryRunner._add_show_weight_movement_argument(lottery_parser)
         LotteryDesc.add_args(parser, defaults)
 
     @staticmethod
     def create_from_args(args: argparse.Namespace) -> 'LotteryRunner':
         return LotteryRunner(args.replicate, args.levels, LotteryDesc.create_from_args(args),
-                             not args.quiet, not args.evaluate_only_at_end)
+                             not args.quiet, not args.evaluate_only_at_end, args.show_weight_movement)
 
     def display_output_location(self):
         print(self.desc.run_path(self.replicate, 0))
@@ -73,6 +82,7 @@ class LotteryRunner(Runner):
             if get_platform().is_primary_process: self._prune_level(level)
             get_platform().barrier()
             self._train_level(level)
+        print(f"weight movements\n {self.weight_movements}")
 
     # Helper methods for running the lottery.
     def _pretrain(self):
@@ -120,16 +130,20 @@ class LotteryRunner(Runner):
                              start_step=self.desc.train_start_step, verbose=self.verbose,
                              evaluate_every_epoch=self.evaluate_every_epoch)
 
-        ### for weight movement calculation
-        initial_model_trained = models.registry.load(self.desc.run_path(self.replicate, 0), self.desc.train_end_step,
-                                     self.desc.model_hparams, self.desc.train_outputs)
-        # reload the initial model with the mask of the current model to calculate the differences correctly
-        initial_model_trained = PrunedModel(initial_model_trained, mask)
-        initial_model_trained._apply_mask()
-        diff = sum((x.detach().cpu() - y.detach().cpu()).abs().sum() for x, y in zip(initial_model_trained.parameters(), pruned_model.parameters()))
-        diff = diff.item()
-        unpruned_weights = mask.count_unpruned_weights().item()
-        print("abs diff:", diff, "unpruned weights:", unpruned_weights, "avg_diff:", diff / unpruned_weights)
+        if(self.show_weight_movement):
+            ### for weight movement calculation
+            initial_model_trained = models.registry.load(self.desc.run_path(self.replicate, 0), self.desc.train_end_step,
+                                        self.desc.model_hparams, self.desc.train_outputs)
+            # reload the initial model with the mask of the current model to calculate the differences correctly
+            initial_model_trained = PrunedModel(initial_model_trained, mask)
+            initial_model_trained._apply_mask()
+            diff = sum((x.detach().cpu() - y.detach().cpu()).abs().sum() for x, y in zip(initial_model_trained.parameters(), pruned_model.parameters()))
+            diff = diff.item()
+            unpruned_weights = mask.count_unpruned_weights().item()
+            avg_diff = diff / unpruned_weights
+            print("abs diff:", diff, "unpruned weights:", unpruned_weights, "avg_diff:", avg_diff)
+            weight_diffs = {"sparsity": mask.sparsity.item(), "abs_diff": diff, "unpruned_weights": unpruned_weights, "avg_diff": avg_diff}
+            self.weight_movements.append(weight_diffs)
 
     def _prune_level(self, level: int):
         new_location = self.desc.run_path(self.replicate, level)
