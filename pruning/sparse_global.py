@@ -15,7 +15,7 @@ from pruning.mask import Mask
 
 @dataclasses.dataclass
 class PruningHparams(hparams.PruningHparams):
-    pruning_fraction: float = 0.975
+    pruning_fraction: float = 0.2
     pruning_layers_to_ignore: str = None
     pruning_method:str = "l1_unstructured"
 
