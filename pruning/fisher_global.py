@@ -18,7 +18,7 @@ import torch
 
 @dataclasses.dataclass
 class PruningHparams(hparams.PruningHparams):
-    pruning_fraction: float = 0.2
+    pruning_fraction: float = 0.975
     pruning_layers_to_ignore: str = None
     dataset_name = "mnist"
 
@@ -35,7 +35,8 @@ class Strategy(base.Strategy):
 
     @staticmethod
     def prune(pruning_hparams: PruningHparams, trained_model: models.base.Model, current_mask: Mask = None):
-        dataset_hparams = hparams.DatasetHparams(pruning_hparams.dataset_name, 1)
+        batch_size = 1
+        dataset_hparams = hparams.DatasetHparams(pruning_hparams.dataset_name, batch_size)
         dataloader = datasets.registry.get(dataset_hparams)
 
         val_dict = {k: v for k, v in trained_model.named_parameters()}
@@ -45,7 +46,7 @@ class Strategy(base.Strategy):
             grad_dict[key] = torch.zeros(val_dict[key].shape)
             fisher_dict[key] = torch.zeros(val_dict[key].shape)
 
-        num_items = 10000
+        num_items = 10000/batch_size
 
         for idx, (data, target) in enumerate(dataloader):
             output = trained_model(data)
@@ -57,8 +58,6 @@ class Strategy(base.Strategy):
             trained_model.loss_criterion.zero_grad()
             if idx == num_items:
                 break
-
-
 
         for key in val_dict.keys():
             fisher_dict[key] = 1 / (2 * num_items) * val_dict[key] ** 2 * grad_dict[key]

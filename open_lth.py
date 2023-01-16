@@ -55,6 +55,7 @@ def main():
         platform.run_job(runner_registry.get(runner_name).create_from_args(args).display_output_location)
         sys.exit(0)
 
+    print(runner_registry.get(runner_name).create_from_args(args).run)
     platform.run_job(runner_registry.get(runner_name).create_from_args(args).run)
 
 
